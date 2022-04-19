@@ -24,28 +24,55 @@ logger = logging.getLogger()
 
 class DenseIndexer(object):
     def __init__(self, buffer_size: int = 50000):
+        """
+        Initialize the indexer.
+        :param buffer_size: size of the buffer to use for indexing
+        """
         self.buffer_size = buffer_size
         self.index_id_to_db_id = []
         self.index = None
         self.copy_of_points = None
 
     def init_index(self, vector_sz: int):
+        """
+        Initialize the index.
+        :param vector_sz: size of the vectors to index
+        """
         raise NotImplementedError
 
     def index_data(self, data: List[Tuple[object, np.array]]):
+        """
+        Index the given data.
+        :param data: list of tuples of (id, vector)
+        """
         raise NotImplementedError
 
     def get_index_name(self):
+        """
+        Get the name of the index.
+        """
         raise NotImplementedError
 
     def search_knn(self, query_vectors: np.array, top_docs: int) -> List[Tuple[List[object], List[float]]]:
+        """
+        Search for the top_docs nearest neighbors of the given query vectors.
+        :param query_vectors: query vectors
+        :param top_docs: number of nearest neighbors to return
+        :return: list of tuples of (id, distance)
+        """
         raise NotImplementedError
 
     def get_copy_of_points(self):
-        # have a secondary copy of the points, which lets more easily index points for our metric
+        """
+        Get a copy of the points in the index.
+        """
         self.copy_of_points = self.index.reconstruct_n(self.index.ntotal)
 
     def serialize(self, file: str):
+        """
+        Serialize the index to disk.
+        :param file: path to the file to write to
+        """
         logger.info("Serializing index to %s", file)
 
         if os.path.isdir(file):
@@ -60,6 +87,10 @@ class DenseIndexer(object):
             pickle.dump(self.index_id_to_db_id, f)
 
     def get_files(self, path: str):
+        """
+        Get the index and meta files for the given path.
+        :param path: path to the index
+        """
         if os.path.isdir(path):
             index_file = os.path.join(path, "index.dpr")
             meta_file = os.path.join(path, "index_meta.dpr")
@@ -69,10 +100,18 @@ class DenseIndexer(object):
         return index_file, meta_file
 
     def index_exists(self, path: str):
+        """
+        Check if the index exists at the given path.
+        :param path: path to the index
+        """
         index_file, meta_file = self.get_files(path)
         return os.path.isfile(index_file) and os.path.isfile(meta_file)
 
     def deserialize(self, path: str):
+        """
+        Deserialize the index from disk.
+        :param path: path to the index
+        """
         logger.info("Loading index from %s", path)
         index_file, meta_file = self.get_files(path)
 
@@ -92,12 +131,24 @@ class DenseIndexer(object):
 
 class DenseFlatIndexer(DenseIndexer):
     def __init__(self, buffer_size: int = 50000):
+        """
+        Initialize a DenseFlatIndexer
+        :param buffer_size: size of the buffer to use when indexing data
+        """
         super(DenseFlatIndexer, self).__init__(buffer_size=buffer_size)
 
     def init_index(self, vector_sz: int):
+        """
+        Initialize the index.
+        :param vector_sz: size of the vectors to index
+        """
         self.index = faiss.IndexFlatIP(vector_sz)
 
     def index_data(self, data: List[Tuple[object, np.array]]):
+        """
+        Index the given data.
+        :param data: list of tuples of (id, vector)
+        """
         n = len(data)
         # indexing in batches is beneficial for many faiss index types
         for i in range(0, n, self.buffer_size):
@@ -112,6 +163,12 @@ class DenseFlatIndexer(DenseIndexer):
         logger.info("Total data indexed %d", indexed_cnt)
 
     def search_knn(self, query_vectors: np.array, top_docs: int) -> List[Tuple[List[object], List[float]]]:
+        """
+        Search for the top_docs nearest neighbors of the given query vectors.
+        :param query_vectors: query vectors
+        :param top_docs: number of nearest neighbors to return
+        :return: list of tuples of (id, distance)
+        """
         scores, indexes = self.index.search(query_vectors, top_docs)
         # convert to external ids
         db_ids = [[self.index_id_to_db_id[i] for i in query_top_idxs] for query_top_idxs in indexes]
@@ -134,6 +191,13 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         ef_search: int = 128,
         ef_construction: int = 200,
     ):
+        """
+        Initialize a DenseHNSWFlatIndexer
+        :param buffer_size: size of the buffer to use when indexing data
+        :param store_n: number of vectors to store in the index
+        :param ef_search: expected number of neighbors to search for
+        :param ef_construction: expected number of neighbors to construct the index
+        """
         super(DenseHNSWFlatIndexer, self).__init__(buffer_size=buffer_size)
         self.store_n = store_n
         self.ef_search = ef_search
@@ -141,6 +205,10 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         self.phi = 0
 
     def init_index(self, vector_sz: int):
+        """
+        Initialize the index.
+        :param vector_sz: size of the vectors to index
+        """
         # IndexHNSWFlat supports L2 similarity only
         # so we have to apply DOT -> L2 similairy space conversion with the help of an extra dimension
         index = faiss.IndexHNSWFlat(vector_sz + 1, self.store_n)
@@ -149,6 +217,10 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         self.index = index
 
     def index_data(self, data: List[Tuple[object, np.array]]):
+        """
+        Index the given data.
+        :param data: list of tuples of (id, vector)
+        """
         n = len(data)
 
         # max norm is required before putting all vectors in the index to convert inner product similarity to L2
@@ -183,10 +255,19 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         logger.info("Total data indexed %d", indexed_cnt)
 
     def train(self, vectors: np.array):
+        """
+        Train the index.
+        :param vectors: vectors to train the index with
+        """
         pass
 
     def search_knn(self, query_vectors: np.array, top_docs: int) -> List[Tuple[List[object], List[float]]]:
-
+        """
+        Search for the top_docs nearest neighbors of the given query vectors.
+        :param query_vectors: query vectors
+        :param top_docs: number of nearest neighbors to return
+        :return: list of tuples of (id, distance)
+        """
         aux_dim = np.zeros(len(query_vectors), dtype="float32")
         query_nhsw_vectors = np.hstack((query_vectors, aux_dim.reshape(-1, 1)))
         logger.info("query_hnsw_vectors %s", query_nhsw_vectors.shape)
@@ -196,6 +277,10 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         return (scores, indexes)
 
     def deserialize(self, file: str):
+        """
+        Deserialize the index from the given file.
+        :param file: file to deserialize the index from
+        """
         super(DenseHNSWFlatIndexer, self).deserialize(file)
         # to trigger exception on subsequent indexing
         self.phi = 1
@@ -216,6 +301,13 @@ class DenseHNSWSQIndexer(DenseHNSWFlatIndexer):
         ef_search: int = 128,
         ef_construction: int = 200,
     ):
+        """
+        Initialize a DenseHNSWSQIndexer
+        :param buffer_size: size of the buffer to use when indexing data
+        :param store_n: number of vectors to store in the index
+        :param ef_search: expected number of neighbors to search for
+        :param ef_construction: expected number of neighbors to construct the index
+        """
         super(DenseHNSWSQIndexer, self).__init__(
             buffer_size=buffer_size,
             store_n=store_n,
@@ -224,6 +316,10 @@ class DenseHNSWSQIndexer(DenseHNSWFlatIndexer):
         )
 
     def init_index(self, vector_sz: int):
+        """
+        Initialize the index.
+        :param vector_sz: size of the vectors to index
+        """
         # IndexHNSWFlat supports L2 similarity only
         # so we have to apply DOT -> L2 similairy space conversion with the help of an extra dimension
         index = faiss.IndexHNSWSQ(vector_sz + 1, faiss.ScalarQuantizer.QT_8bit, self.store_n)
@@ -232,7 +328,14 @@ class DenseHNSWSQIndexer(DenseHNSWFlatIndexer):
         self.index = index
 
     def train(self, vectors: np.array):
+        """
+        Train the index.
+        :param vectors: vectors to train the index with
+        """
         self.index.train(vectors)
 
     def get_index_name(self):
+        """
+        Get the name of the index.
+        """
         return "hnswsq_index"

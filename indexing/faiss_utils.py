@@ -8,7 +8,8 @@ def distance_to_centroid_faiss(indexer : DenseHNSWFlatIndexer, query_points = 10
     """
     Computes the variance on distance to centroid of a faiss index.
     :param index: faiss index
-    :param points: number of points to sample
+    :param query_points: number of query points
+    :param points_per_query: number of points per query
     :return: numpy array of shape (points, dim)
     """
     # get the points
