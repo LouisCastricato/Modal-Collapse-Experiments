@@ -66,7 +66,7 @@ class DenseIndexer(object):
         """
         Get a copy of the points in the index.
         """
-        self.copy_of_points = self.index.reconstruct_n(self.index.ntotal)
+        self.copy_of_points = self.index.reconstruct_n(0, self.index.ntotal)
 
     def serialize(self, file: str):
         """

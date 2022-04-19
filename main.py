@@ -2,6 +2,10 @@ from utils import *
 import matplotlib.pyplot as plt
 from functools import partial
 from multiprocessing import Pool
+import faiss 
+from indexing.faiss_utils import distance_to_centroid_faiss
+from indexing.faiss_indexers import DenseHNSWFlatIndexer
+from tqdm import tqdm
 
 def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function=get_hypersphere_points):
     # get hyper sphere points
@@ -44,31 +48,43 @@ if __name__ == '__main__':
     rotation_count = 1
 
     # generate data
-    hypersphere_data = generate_data(data_points, dim, rotation_count,
-        generate_function=get_hypersphere_points)
-    splooch_data = generate_data(data_points, dim, rotation_count,
-        generate_function=partial(get_splooch_points, scale_upper_bound=0.25, splooches=100))
+    hypersphere_data = np.float32(generate_data(data_points, dim, rotation_count,
+        generate_function=get_hypersphere_points))
+    splooch_data = np.float32(generate_data(data_points, dim, rotation_count,
+        generate_function=partial(get_splooch_points, scale_upper_bound=0.25, splooches=100)))
 
     # interpolate between the two datasets
     def linear_interpolate(dataset1, dataset2):
+
         def interp(t):
             output = dataset1 * (1 - t) + dataset2 * t
             # normalize output
             output = output / np.linalg.norm(output, axis=1).reshape(-1, 1)
             return output
 
-        return interp
+        def construct_faiss(interp):
+            # create a faiss index from linear interpolation data data
+            indexer = DenseHNSWFlatIndexer()
+            indexer.init_index(dim)
+            # We need to associate each vector with a database id
+            zipped_data = list(map(lambda x: x, zip(range(interp.shape[0]), list(interp))))
+            indexer.index_data(zipped_data)
+            indexer.get_copy_of_points()
+            return indexer
+
+        def compose(t):
+            return construct_faiss(interp(t))
+
+        return compose
 
     # interpolate
     interp = linear_interpolate(hypersphere_data, splooch_data)
-    # multiprocessing
-    pool = Pool(processes=8)
+
     # get variance
-    variances = pool.map(partial(get_k_means_variance, k=cluster_count), [interp(i/10) for i in range(10)])
-    pool.close()
+    variances = list()
+    for i in tqdm(range(10)):
+        variances.append(distance_to_centroid_faiss(interp(float(i)/10.)))
 
-
-    
     for idx, var in enumerate(variances):
         # compute a histogram using matplotlib
         plt.hist(var)

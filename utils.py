@@ -1,7 +1,6 @@
 # implements a number of helper functions to compute k-means clusters and related
 
 import numpy as np
-import pandas as pd
 from sklearn.cluster import KMeans, DBSCAN
 from scipy.stats import ortho_group
 import skdim.datasets

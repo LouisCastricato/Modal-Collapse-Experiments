@@ -1,0 +1,9 @@
+faiss-gpu
+sklearn
+scikit-dimension
+numba
+scipy
+numpy
+matplotlib
+transformers
+datasets
