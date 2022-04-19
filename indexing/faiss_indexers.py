@@ -143,6 +143,10 @@ class DenseFlatIndexer(DenseIndexer):
         :param vector_sz: size of the vectors to index
         """
         self.index = faiss.IndexFlatIP(vector_sz)
+        
+        res = faiss.StandardGpuResources() # use a single GPU
+        self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
+
 
     def index_data(self, data: List[Tuple[object, np.array]]):
         """
@@ -170,10 +174,8 @@ class DenseFlatIndexer(DenseIndexer):
         :return: list of tuples of (id, distance)
         """
         scores, indexes = self.index.search(query_vectors, top_docs)
-        # convert to external ids
-        db_ids = [[self.index_id_to_db_id[i] for i in query_top_idxs] for query_top_idxs in indexes]
-        result = [(db_ids[i], scores[i]) for i in range(len(db_ids))]
-        return result
+
+        return scores, indexes 
 
     def get_index_name(self):
         return "flat_index"

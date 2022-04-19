@@ -1,11 +1,10 @@
 from utils import *
 import matplotlib.pyplot as plt
 from functools import partial
-from multiprocessing import Pool
-import faiss 
 from indexing.faiss_utils import distance_to_centroid_faiss
-from indexing.faiss_indexers import DenseHNSWFlatIndexer
+from indexing.faiss_indexers import DenseFlatIndexer
 from tqdm import tqdm
+from scipy.stats import skew, kurtosis
 
 def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function=get_hypersphere_points):
     # get hyper sphere points
@@ -42,7 +41,7 @@ def get_k_means_variance(data, k):
 if __name__ == '__main__':
 
     # constants
-    data_points = 10000
+    data_points = 1000000
     dim = 128
     cluster_count = 100
     rotation_count = 1
@@ -64,7 +63,7 @@ if __name__ == '__main__':
 
         def construct_faiss(interp):
             # create a faiss index from linear interpolation data data
-            indexer = DenseHNSWFlatIndexer()
+            indexer = DenseFlatIndexer()
             indexer.init_index(dim)
             # We need to associate each vector with a database id
             zipped_data = list(map(lambda x: x, zip(range(interp.shape[0]), list(interp))))
@@ -87,6 +86,7 @@ if __name__ == '__main__':
 
     for idx, var in enumerate(variances):
         # compute a histogram using matplotlib
+        print("Skew, kurtosis:", skew(var), kurtosis(var))
         plt.hist(var)
         plt.show()
         plt.savefig('graphs/variance_interp_' + str(idx) + '.png')

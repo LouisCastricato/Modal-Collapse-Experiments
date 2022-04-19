@@ -1,10 +1,10 @@
 # This file is used to load faiss indexes and compute our variance metric
 
 from utils import get_hypersphere_points, compute_distances_from_centroid
-from indexing.faiss_indexers import DenseHNSWFlatIndexer
+from indexing.faiss_indexers import DenseFlatIndexer
 import numpy as np
 
-def distance_to_centroid_faiss(indexer : DenseHNSWFlatIndexer, query_points_amount = 1000, points_per_query = 100):
+def distance_to_centroid_faiss(indexer : DenseFlatIndexer, query_points_amount = 1000, points_per_query = 100):
     """
     Computes the variance on distance to centroid of a faiss index.
     :param index: faiss index
@@ -13,10 +13,11 @@ def distance_to_centroid_faiss(indexer : DenseHNSWFlatIndexer, query_points_amou
     :return: numpy array of shape (points, dim)
     """
     # gets probing points
-    query_points = np.float32(get_hypersphere_points(query_points_amount, indexer.index.d-1))
+    query_points = np.float32(get_hypersphere_points(query_points_amount, indexer.index.d))
 
     # sample the faiss index around each of these points
     _, indexes = indexer.search_knn(query_points, points_per_query)
+
     # get the points
     pts = list()
     # lets assume for now that pts is grouped by query points, although i am not sure that this is the case lol
