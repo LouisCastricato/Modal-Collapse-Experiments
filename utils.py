@@ -31,6 +31,36 @@ def get_hypersphere_points(set_size=1000, dim=512):
     """
     return skdim.datasets.hyperSphere(set_size, dim)
 
+def get_normalized_hypercube_points(set_size=1000, dim=512):
+    """
+    Generates a set of points on a hypercube of dimension dim.
+    """
+    output = np.array([np.random.uniform(-1, 1, dim) for _ in range(set_size)])
+    output = output / np.linalg.norm(output, axis=1).reshape(-1, 1)
+    return output
+
+def get_splooch_points(set_size=1000, dim=512, splooches=10):
+    """
+    Generates a set of points that splooch the surface of a hyper sphere
+    """
+    points_per_splooch = set_size // splooches
+    splooch_list = list()
+    for i in range(splooches):
+        splooch = get_hypersphere_points(points_per_splooch, dim)
+        random_direction = np.random.uniform(-1, 1, dim)
+        random_scale = np.random.uniform(0, 1)
+
+        splooch = splooch * random_scale + random_direction
+
+        # normalize splooch
+        splooch = splooch / np.linalg.norm(splooch, axis=1).reshape(-1, 1)
+        # append
+        splooch_list.append(splooch)
+
+    # concatenate list of numpy arrays into numpy array
+    return np.concatenate(splooch_list)
+
+
 def generate_a_random_rotation_matrix(dim=512):
     """
     Generates a random rotation matrix of dimension dim.

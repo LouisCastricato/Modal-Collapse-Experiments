@@ -1,16 +1,10 @@
 from utils import *
 import matplotlib.pyplot as plt
 
-if __name__ == '__main__':
 
-    # constants
-    data_points = 10000
-    dim = 512
-    cluster_count = 100
-    rotation_count = 100
-
+def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function=get_hypersphere_points):
     # get hyper sphere points
-    data = get_hypersphere_points(data_points, dim)
+    data = generate_function(data_points, dim)
 
     # get a random rotation matrix
     R = [generate_a_random_rotation_matrix(dim) for _ in range(rotation_count)]
@@ -23,20 +17,54 @@ if __name__ == '__main__':
     # concat
     data = np.reshape(np.stack(rotated_data, axis=0), (len(rotated_data) * data_points, -1))
     # random sample
-    data = data[np.random.choice(data_points*(rotation_count+1), data_points, replace=False)]
+    return data[np.random.choice(data_points*(rotation_count+1), data_points, replace=False)]
 
-    clusters = compute_kmeans(data, k=cluster_count)
+def get_k_means_variance(data, k):
+    """
+    Computes the variance of the k-means clustering on the given data.
+    :param data: numpy array of shape (n, d)
+    :param k: number of clusters
+    """
+    clusters = compute_kmeans(data, k=k)
 
     def get_cluster(cluster_idx):
         return get_where_index(data, clusters, cluster_idx)
 
     # get the variance of each cluster
-    var = [np.var(get_cluster(i)) for i in range(cluster_count)]
+    return [np.var(get_cluster(i)) for i in range(k)]
 
-    # compute a histogram using matplotlib
-    plt.hist(var)
-    plt.show()
 
-    #save plt to file
-    plt.savefig('var.png')
+if __name__ == '__main__':
+
+    # constants
+    data_points = 10000
+    dim = 128
+    cluster_count = 100
+    rotation_count = 1
+
+    # generate data
+    hypersphere_data = generate_data(data_points, dim, rotation_count, generate_function=get_hypersphere_points)
+    splooch_data = generate_data(data_points, dim, rotation_count, generate_function=get_splooch_points)
+
+    # interpolate between the two datasets
+    def linear_interpolate(dataset1, dataset2):
+        def interp(t):
+            output = dataset1 * (1 - t) + dataset2 * t
+            # normalize output
+            output = output / np.linalg.norm(output, axis=1).reshape(-1, 1)
+            return output
+
+        return interp
+
+    # interpolate
+    interp = linear_interpolate(hypersphere_data, splooch_data)
+    for i in range(10):
+        # get variance
+        variance = get_k_means_variance(interp(float(i)/10.), cluster_count)
+
+        # compute a histogram using matplotlib
+        plt.hist(variance)
+        plt.show()
+        plt.savefig('graphs/variance_interp_' + str(i) + '.png')
+        plt.clf()
 
