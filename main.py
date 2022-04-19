@@ -90,7 +90,7 @@ if __name__ == '__main__':
     for idx, var in enumerate(variances):
         # compute a histogram using matplotlib
         print("Skew, kurtosis:", skew(var), kurtosis(var))
-        plt.hist(var)
+        plt.hist(var, bins=64)
         plt.show()
         plt.savefig('graphs/variance_interp_' + str(idx) + '.png')
         plt.clf()
