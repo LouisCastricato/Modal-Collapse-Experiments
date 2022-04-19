@@ -31,7 +31,8 @@ class DenseIndexer(object):
         self.buffer_size = buffer_size
         self.index_id_to_db_id = []
         self.index = None
-        self.copy_of_points = None
+        self.centroids = None
+        self.copy_of_points = list()
 
     def init_index(self, vector_sz: int):
         """
@@ -40,12 +41,26 @@ class DenseIndexer(object):
         """
         raise NotImplementedError
 
+    def get_centroids(self):
+        """
+        Compute the centroids from the index.
+        """
+        self.centroids = self.index.quantizer.reconstruct_n(0, self.index.nlist)
+
+
     def index_data(self, data: List[Tuple[object, np.array]]):
         """
         Index the given data.
         :param data: list of tuples of (id, vector)
         """
         raise NotImplementedError
+
+    def train(self, vectors: np.array):
+        """
+        Train the index.
+        :param vectors: vectors to train the index with
+        """
+        self.index.train(vectors)
 
     def get_index_name(self):
         """
@@ -62,11 +77,11 @@ class DenseIndexer(object):
         """
         raise NotImplementedError
 
-    def get_copy_of_points(self):
+    def set_copy_of_points(self, copy_of_points: List):
         """
-        Get a copy of the points in the index.
+        Set the copy of points to use for indexing.
         """
-        self.copy_of_points = self.index.reconstruct_n(0, self.index.ntotal)
+        self.copy_of_points = copy_of_points
 
     def serialize(self, file: str):
         """
@@ -142,7 +157,7 @@ class DenseFlatIndexer(DenseIndexer):
         Initialize the index.
         :param vector_sz: size of the vectors to index
         """
-        self.index = faiss.IndexFlatIP(vector_sz)
+        self.index = faiss.index_factory(vector_sz, "IVF256,Flat", faiss.METRIC_INNER_PRODUCT)
         
         res = faiss.StandardGpuResources() # use a single GPU
         self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
@@ -175,7 +190,9 @@ class DenseFlatIndexer(DenseIndexer):
         """
         scores, indexes = self.index.search(query_vectors, top_docs)
 
-        return scores, indexes 
+        # convert to external ids
+        db_ids = [[self.index_id_to_db_id[i] for i in query_top_idxs] for query_top_idxs in indexes]
+        return db_ids, scores
 
     def get_index_name(self):
         return "flat_index"
@@ -183,7 +200,7 @@ class DenseFlatIndexer(DenseIndexer):
 
 class DenseHNSWFlatIndexer(DenseIndexer):
     """
-    Efficient index for retrieval. Note: default settings are for hugh accuracy but also high RAM usage
+    Efficient index for retrieval. Note: default settings are for high accuracy but also high RAM usage
     """
 
     def __init__(
@@ -256,13 +273,6 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         indexed_cnt = len(self.index_id_to_db_id)
         logger.info("Total data indexed %d", indexed_cnt)
 
-    def train(self, vectors: np.array):
-        """
-        Train the index.
-        :param vectors: vectors to train the index with
-        """
-        pass
-
     def search_knn(self, query_vectors: np.array, top_docs: int) -> List[Tuple[List[object], List[float]]]:
         """
         Search for the top_docs nearest neighbors of the given query vectors.
@@ -275,8 +285,9 @@ class DenseHNSWFlatIndexer(DenseIndexer):
         logger.info("query_hnsw_vectors %s", query_nhsw_vectors.shape)
         scores, indexes = self.index.search(query_nhsw_vectors, top_docs)
 
-
-        return (scores, indexes)
+        # convert to external ids
+        db_ids = [[self.index_id_to_db_id[i] for i in query_top_idxs] for query_top_idxs in indexes]
+        return db_ids, scores
 
     def deserialize(self, file: str):
         """
@@ -293,7 +304,7 @@ class DenseHNSWFlatIndexer(DenseIndexer):
 
 class DenseHNSWSQIndexer(DenseHNSWFlatIndexer):
     """
-    Efficient index for retrieval. Note: default settings are for hugh accuracy but also high RAM usage
+    Efficient index for retrieval. Note: default settings are for high accuracy but also high RAM usage
     """
 
     def __init__(

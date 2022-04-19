@@ -5,6 +5,7 @@ from indexing.faiss_utils import distance_to_centroid_faiss
 from indexing.faiss_indexers import DenseFlatIndexer
 from tqdm import tqdm
 from scipy.stats import skew, kurtosis
+from multiprocess import Pool
 
 def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function=get_hypersphere_points):
     # get hyper sphere points
@@ -12,7 +13,7 @@ def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function
 
     # get a random rotation matrix
     R = [generate_a_random_rotation_matrix(dim) for _ in range(rotation_count)]
-    
+
     # apply the rotation matrix to the data
     rotated_data = [data]
     for _ in range(rotation_count):
@@ -51,7 +52,7 @@ if __name__ == '__main__':
     hypersphere_data = np.float32(generate_data(data_points, dim, rotation_count,
         generate_function=get_hypersphere_points))
     splooch_data = np.float32(generate_data(data_points, dim, rotation_count,
-        generate_function=partial(get_splooch_points, scale_upper_bound=0.25, splooches=100)))
+        generate_function=partial(get_splooch_points, scale_upper_bound=0.5, splooches=200)))
 
     # interpolate between the two datasets
     def linear_interpolate(dataset1, dataset2):
@@ -68,8 +69,11 @@ if __name__ == '__main__':
             indexer.init_index(dim)
             # We need to associate each vector with a database id
             zipped_data = list(map(lambda x: x, zip(range(interp.shape[0]), list(interp))))
+            indexer.train(interp)
             indexer.index_data(zipped_data)
-            indexer.get_copy_of_points()
+            indexer.set_copy_of_points(interp)
+            indexer.get_centroids()
+
             return indexer
 
         def compose(t):
@@ -81,9 +85,7 @@ if __name__ == '__main__':
     interp = linear_interpolate(hypersphere_data, splooch_data)
 
     # get variance
-    variances = list()
-    for i in tqdm(range(10)):
-        variances.append(distance_to_centroid_faiss(interp(float(i)/10.)))
+    variances = list(map(distance_to_centroid_faiss, [interp(t) for t in tqdm(np.linspace(0, 1, 10))]))
 
     for idx, var in enumerate(variances):
         # compute a histogram using matplotlib

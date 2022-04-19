@@ -23,8 +23,8 @@ def compute_distances_from_centroid(data):
     """
     # compute centroid
     centroid = np.mean(data, axis=0)
-    # compute distances using cosine similarity
-    return 1 - np.dot(data, centroid) 
+    # compute distances. Cosine similarity is not very good, back to L2
+    return np.linalg.norm(data - centroid, axis=1)
 
 def get_where_index(data, km, label_index):
     """
