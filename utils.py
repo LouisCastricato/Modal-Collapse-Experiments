@@ -2,7 +2,7 @@
 
 import numpy as np
 import pandas as pd
-from sklearn.cluster import KMeans
+from sklearn.cluster import KMeans, DBSCAN
 from scipy.stats import ortho_group
 import skdim.datasets
 
@@ -15,6 +15,17 @@ def compute_kmeans(data, k):
     """
     kmeans = KMeans(n_clusters=k).fit(data)
     return kmeans
+
+def compute_distances_from_centroid(data):
+    """
+    Computes the distances of each data point from the centroid of the data.
+    :param data: numpy array of shape (n, d)
+    :return: numpy array of shape (n, 1)
+    """
+    # compute centroid
+    centroid = np.mean(data, axis=0)
+    # compute distances
+    return np.linalg.norm(data - centroid, axis=1)
 
 def get_where_index(data, km, label_index):
     """
@@ -39,7 +50,7 @@ def get_normalized_hypercube_points(set_size=1000, dim=512):
     output = output / np.linalg.norm(output, axis=1).reshape(-1, 1)
     return output
 
-def get_splooch_points(set_size=1000, dim=512, splooches=10):
+def get_splooch_points(set_size=1000, dim=512, splooches=10, scale_upper_bound=1.0):
     """
     Generates a set of points that splooch the surface of a hyper sphere
     """
@@ -48,7 +59,7 @@ def get_splooch_points(set_size=1000, dim=512, splooches=10):
     for i in range(splooches):
         splooch = get_hypersphere_points(points_per_splooch, dim)
         random_direction = np.random.uniform(-1, 1, dim)
-        random_scale = np.random.uniform(0, 1)
+        random_scale = np.random.uniform(0, scale_upper_bound)
 
         splooch = splooch * random_scale + random_direction
 
