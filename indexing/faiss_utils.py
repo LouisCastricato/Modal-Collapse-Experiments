@@ -4,7 +4,7 @@ from utils import get_hypersphere_points, compute_distances_from_centroid
 from indexing.faiss_indexers import DenseFlatIndexer
 import numpy as np
 
-def distance_to_centroid_faiss(indexer : DenseFlatIndexer, query_points_amount = 1000, points_per_query = 100):
+def distance_to_centroid_faiss(indexer : DenseFlatIndexer, query_points_amount = 1000, points_per_query = 100, min_sim=0.2):
     """
     Computes the variance on distance to centroid of a faiss index.
     :param index: faiss index
@@ -22,16 +22,20 @@ def distance_to_centroid_faiss(indexer : DenseFlatIndexer, query_points_amount =
     pts = list()
     # lets assume for now that pts is grouped by query points, although i am not sure that this is the case lol
     for i in range(query_points_amount):
-        pts.append(list())
+        cluster_points = list()
+
         for idx in indexes[i]:
-            pts[i].append(indexer.copy_of_points[idx])
+            if np.dot(query_points[i],indexer.copy_of_points[idx]) > min_sim:
+                cluster_points.append(indexer.copy_of_points[idx])
+        if len(cluster_points) > 0:
+            pts.append(cluster_points)
     
     # pts is now a list of list of np.array, lets convert it a list of np.array
-    pts = [np.array(pts[i]) for i in range(query_points_amount)]
+    pts = [np.array(pts[i]) for i in range(len(pts))]
 
     # compute the distance to centroid for each of the points
-    distances = [compute_distances_from_centroid(pts[i]) for i in range(query_points_amount)]
+    distances = [compute_distances_from_centroid(pts[i]) for i in range(len(pts))]
     # compute the variance of each set of distances
-    variances = [np.var(distances[i]) for i in range(query_points_amount)]
+    variances = [np.var(distances[i]) for i in range(len(pts))]
 
     return np.array(variances)

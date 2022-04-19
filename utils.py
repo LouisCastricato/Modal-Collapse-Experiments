@@ -23,8 +23,8 @@ def compute_distances_from_centroid(data):
     """
     # compute centroid
     centroid = np.mean(data, axis=0)
-    # compute distances
-    return np.linalg.norm(data - centroid, axis=1)
+    # compute distances using cosine similarity
+    return 1 - np.dot(data, centroid) 
 
 def get_where_index(data, km, label_index):
     """
@@ -55,7 +55,7 @@ def get_splooch_points(set_size=1000, dim=512, splooches=10, scale_upper_bound=1
     """
     points_per_splooch = set_size // splooches
     splooch_list = list()
-    for i in range(splooches):
+    for _ in range(splooches):
         splooch = get_hypersphere_points(points_per_splooch, dim)
         random_direction = np.random.uniform(-1, 1, dim)
         random_scale = np.random.uniform(0, scale_upper_bound)

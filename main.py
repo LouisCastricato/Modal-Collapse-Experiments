@@ -12,6 +12,7 @@ def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function
 
     # get a random rotation matrix
     R = [generate_a_random_rotation_matrix(dim) for _ in range(rotation_count)]
+    
     # apply the rotation matrix to the data
     rotated_data = [data]
     for _ in range(rotation_count):
