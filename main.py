@@ -1,7 +1,7 @@
 from utils import *
 import matplotlib.pyplot as plt
 from functools import partial
-from indexing.faiss_utils import distance_to_centroid_faiss, batch
+from indexing.faiss_utils import distance_to_centroid_faiss, singular_value_plot_faiss, batch
 from indexing.faiss_indexers import DenseFlatIndexer
 from tqdm import tqdm
 from scipy.stats import skew, kurtosis
@@ -62,9 +62,10 @@ if __name__ == '__main__':
 
     # get variance
     variances = list(map(partial(distance_to_centroid_faiss, filter_condition=cosine_filter_condition), [batched(t) for t in tqdm(range(len(datasets)))]))
-    singular_values = list(map(partial(generate_singular_value_plot, k=None), tqdm(datasets)))
+    singular_values = list(map(singular_value_plot_faiss, [batched(t) for t in tqdm(range(len(datasets)))]))
+    singular_values_global = list(map(generate_singular_value_plot, tqdm(datasets)))
 
-    for idx, (var, svs) in enumerate(zip(variances, singular_values)):
+    for idx, (var, svl, svg) in enumerate(zip(variances, singular_values, singular_values_global)):
         # compute a histogram using matplotlib
         print("Skew, kurtosis:", skew(var), kurtosis(var))
         plt.hist(var, bins=64)
@@ -72,9 +73,16 @@ if __name__ == '__main__':
         plt.savefig('graphs/variance_batch_' + str(idx) + '.png')
         plt.clf()
 
-        plt.semilogy(svs)
+        for s in svl:
+            plt.semilogy(s)
+
         plt.show()
         plt.savefig('graphs/singular_values_batch_' + str(idx) + '.png')
+        plt.clf()
+
+        plt.semilogy(svg)
+        plt.show()
+        plt.savefig('graphs/singular_values_global_' + str(idx) + '.png')
         plt.clf()
 
 

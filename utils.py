@@ -24,7 +24,7 @@ def compute_distances_from_centroid(data):
     # compute centroid
     centroid = np.mean(data, axis=0)
     # compute distances. Cosine similarity is not very good, back to L2
-    return 1 - np.dot(data, centroid)
+    return np.linalg.norm(data - centroid, axis=1)
 
 def get_where_index(data, km, label_index):
     """
@@ -79,7 +79,7 @@ def generate_a_random_rotation_matrix(dim=512):
     return ortho_group.rvs(dim)
 
 
-def generate_singular_value_plot(data, k=2, size=10000):
+def generate_singular_value_plot(data, k=None, size=10000):
     """
     Generates a singular value plot for the given data.
     :param data: numpy array of shape (n, d)
@@ -90,10 +90,6 @@ def generate_singular_value_plot(data, k=2, size=10000):
     if len(data) > size:
         idxs = np.random.choice(range(len(data)), size, replace=False)
         data = data[idxs]
+
     # compute SVD
-    _, s, _ = np.linalg.svd(data)
-    # plot
-    if k is None:
-        return np.log(s)
-    else:
-        return np.log(s[:k])
+    return np.flip(np.linalg.eigvalsh(np.cov(data.T)))
