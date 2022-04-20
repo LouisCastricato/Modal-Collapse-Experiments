@@ -24,7 +24,7 @@ def compute_distances_from_centroid(data):
     # compute centroid
     centroid = np.mean(data, axis=0)
     # compute distances. Cosine similarity is not very good, back to L2
-    return np.linalg.norm(data - centroid, axis=1)
+    return 1 - np.dot(data, centroid)
 
 def get_where_index(data, km, label_index):
     """
@@ -78,16 +78,22 @@ def generate_a_random_rotation_matrix(dim=512):
     # uses the orthogonal group of dimension dim
     return ortho_group.rvs(dim)
 
-def compute_sample_skew_CI(n):
-    """
-    Computes the confidence interval for the sample skew of the given data.
-    :param n: number of samples
-    :return: numpy array of shape (2, 1)
-    """
-    return np.array([np.sqrt(n) / np.sqrt(n - 1), np.sqrt(n) / np.sqrt(n - 1)])
 
-def flatten(t):
+def generate_singular_value_plot(data, k=2, size=10000):
     """
-    Flattens a list of lists.
+    Generates a singular value plot for the given data.
+    :param data: numpy array of shape (n, d)
+    :param k: number of singular values to plot
+    :param size: number of points to use for the plot
     """
-    return [item for sublist in t for item in sublist]
+    # if len(data) > size, sample data
+    if len(data) > size:
+        idxs = np.random.choice(range(len(data)), size, replace=False)
+        data = data[idxs]
+    # compute SVD
+    _, s, _ = np.linalg.svd(data)
+    # plot
+    if k is None:
+        return np.log(s)
+    else:
+        return np.log(s[:k])

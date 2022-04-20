@@ -1,7 +1,7 @@
 from utils import *
 import matplotlib.pyplot as plt
 from functools import partial
-from indexing.faiss_utils import distance_to_centroid_faiss
+from indexing.faiss_utils import distance_to_centroid_faiss, batch
 from indexing.faiss_indexers import DenseFlatIndexer
 from tqdm import tqdm
 from scipy.stats import skew, kurtosis
@@ -47,51 +47,34 @@ if __name__ == '__main__':
     dim = 128
     cluster_count = 100
     rotation_count = 1
-
+    path = "/mnt/raid/gits/tda-CLIP/coco_train2017_image_embeds.npy"
+    path2 = "/mnt/raid/gits/tda-CLIP/coco_train2017_text_embeds.npy"
     # generate data
-    hypersphere_data = np.float32(generate_data(data_points, dim, rotation_count,
-        generate_function=get_hypersphere_points))
-    splooch_data = np.float32(generate_data(data_points, dim, rotation_count,
-        generate_function=partial(get_splooch_points, scale_upper_bound=0.5, splooches=200)))
+    image_embeds = np.load(path)
+    text_embeds = np.load(path2)
+    both_embeds = np.concatenate((image_embeds, text_embeds), axis=0)
+    datasets = [image_embeds, text_embeds, both_embeds]
 
-    # interpolate between the two datasets
-    def linear_interpolate(dataset1, dataset2):
+    batched = batch(datasets)
 
-        def interp(t):
-            output = dataset1 * (1 - t) + dataset2 * t
-            # normalize output
-            output = output / np.linalg.norm(output, axis=1).reshape(-1, 1)
-            return output
-
-        def construct_faiss(interp):
-            # create a faiss index from linear interpolation data data
-            indexer = DenseFlatIndexer()
-            indexer.init_index(dim)
-            # We need to associate each vector with a database id
-            zipped_data = list(map(lambda x: x, zip(range(interp.shape[0]), list(interp))))
-            indexer.train(interp)
-            indexer.index_data(zipped_data)
-            indexer.set_copy_of_points(interp)
-            indexer.get_centroids()
-
-            return indexer
-
-        def compose(t):
-            return construct_faiss(interp(t))
-
-        return compose
-
-    # interpolate
-    interp = linear_interpolate(hypersphere_data, splooch_data)
+    def cosine_filter_condition(pt1, pt2):
+        return (np.dot(pt1, pt2) / (np.linalg.norm(pt1) * np.linalg.norm(pt2)) > 0.2)
 
     # get variance
-    variances = list(map(distance_to_centroid_faiss, [interp(t) for t in tqdm(np.linspace(0, 1, 10))]))
+    variances = list(map(partial(distance_to_centroid_faiss, filter_condition=cosine_filter_condition), [batched(t) for t in tqdm(range(len(datasets)))]))
+    singular_values = list(map(partial(generate_singular_value_plot, k=None), tqdm(datasets)))
 
-    for idx, var in enumerate(variances):
+    for idx, (var, svs) in enumerate(zip(variances, singular_values)):
         # compute a histogram using matplotlib
         print("Skew, kurtosis:", skew(var), kurtosis(var))
         plt.hist(var, bins=64)
         plt.show()
-        plt.savefig('graphs/variance_interp_' + str(idx) + '.png')
+        plt.savefig('graphs/variance_batch_' + str(idx) + '.png')
         plt.clf()
+
+        plt.semilogy(svs)
+        plt.show()
+        plt.savefig('graphs/singular_values_batch_' + str(idx) + '.png')
+        plt.clf()
+
 

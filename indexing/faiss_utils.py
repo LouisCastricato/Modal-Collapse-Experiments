@@ -8,7 +8,7 @@ import numpy as np
 def default_condition(pt1, pt2):
     return True
 
-def distance_to_centroid_faiss(indexer : DenseFlatIndexer, points_per_query = 100, condition = default_condition):
+def distance_to_centroid_faiss(indexer : DenseFlatIndexer, points_per_query = 100, filter_condition = default_condition):
     """
     Computes the variance on distance to centroid of a faiss index.
     :param index: faiss index
@@ -28,7 +28,7 @@ def distance_to_centroid_faiss(indexer : DenseFlatIndexer, points_per_query = 10
         cluster_points = list()
 
         for idx in indexes[i]:
-            if condition(query_points[i],indexer.copy_of_points[idx]):
+            if filter_condition(query_points[i],indexer.copy_of_points[idx]):
                 cluster_points.append(indexer.copy_of_points[idx])
         if len(cluster_points) > 0:
             pts.append(cluster_points)
@@ -39,6 +39,37 @@ def distance_to_centroid_faiss(indexer : DenseFlatIndexer, points_per_query = 10
     # compute the distance to centroid for each of the points
     distances = [compute_distances_from_centroid(pts[i]) for i in range(len(pts))]
     # compute the variance of each set of distances
-    variances = [np.var(distances[i]) for i in range(len(pts))]
+    variances = [np.mean(distances[i]) for i in range(len(pts))]
 
     return np.array(variances)
+
+def construct_faiss(dataset):
+    """
+    Constructs a faiss index from a numpy array
+    :param dataset: numpy array of shape (n, d)
+    :return: faiss index
+    """
+    indexer = DenseFlatIndexer()
+    indexer.init_index(dataset.shape[1])
+    # We need to associate each vector with a database id
+    zipped_data = list(map(lambda x: x, zip(range(dataset.shape[0]), list(dataset))))
+    indexer.train(dataset)
+    indexer.index_data(zipped_data)
+    indexer.set_copy_of_points(dataset)
+    indexer.get_centroids()
+
+    return indexer
+
+# interpolate between the two datasets
+def linear_interpolate(dataset1, dataset2):
+    def interp(t):
+        output = (1-t) * dataset1 + t * dataset2
+        # normalize output
+        output = output / np.linalg.norm(output, axis=1).reshape(-1, 1)
+        return construct_faiss(output)
+    return interp
+
+def batch(datasets):
+    def get_dataset(t):
+        return construct_faiss(datasets[t])
+    return get_dataset

@@ -157,7 +157,7 @@ class DenseFlatIndexer(DenseIndexer):
         Initialize the index.
         :param vector_sz: size of the vectors to index
         """
-        self.index = faiss.index_factory(vector_sz, "IVF256,Flat", faiss.METRIC_INNER_PRODUCT)
+        self.index = faiss.index_factory(vector_sz, "IVF1024,Flat", faiss.METRIC_INNER_PRODUCT)
         
         res = faiss.StandardGpuResources() # use a single GPU
         self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
