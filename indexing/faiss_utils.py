@@ -63,7 +63,7 @@ def singular_value_plot_faiss(indexer : DenseFlatIndexer, points_per_query = 500
     """
     # get points
     pts = get_cluster_points_faiss(indexer, points_per_query, filter_condition,
-        query_points=None)#np.float32(get_hypersphere_points(set_size=256, dim=indexer.index.d)))
+        query_points=np.float32(get_hypersphere_points(set_size=256, dim=indexer.index.d)))
     # compute the distance to centroid for each of the points
     singular_values = [generate_singular_value_plot(pts[i]) for i in range(len(pts))]
 
