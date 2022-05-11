@@ -1,43 +1,11 @@
-from utils import *
+from modalcollapse.utils import *
 import matplotlib.pyplot as plt
 from functools import partial
-from indexing.faiss_utils import distance_to_centroid_faiss, singular_value_plot_faiss, batch
-from indexing.faiss_indexers import DenseFlatIndexer
+from modalcollapse.indexing.faiss_utils import distance_to_centroid_faiss, singular_value_plot_faiss, batch
+from modalcollapse.indexing.faiss_indexers import DenseFlatIndexer
 from tqdm import tqdm
 from scipy.stats import skew, kurtosis
 from multiprocess import Pool
-
-def generate_data(data_points=1000, dim=512, rotation_count=1, generate_function=get_hypersphere_points):
-    # get hyper sphere points
-    data = generate_function(data_points, dim)
-
-    # get a random rotation matrix
-    R = [generate_a_random_rotation_matrix(dim) for _ in range(rotation_count)]
-
-    # apply the rotation matrix to the data
-    rotated_data = [data]
-    for _ in range(rotation_count):
-        choice = np.random.choice(len(R), 1)[0]
-        rotated_data.append(np.dot(rotated_data[-1], R[choice]))
-
-    # concat
-    data = np.reshape(np.stack(rotated_data, axis=0), (len(rotated_data) * data_points, -1))
-    # random sample
-    return data[np.random.choice(data_points*(rotation_count+1), data_points, replace=False)]
-
-def get_k_means_variance(data, k):
-    """
-    Computes the variance of the k-means clustering on the given data.
-    :param data: numpy array of shape (n, d)
-    :param k: number of clusters
-    """
-    clusters = compute_kmeans(data, k=k)
-
-    def get_cluster(cluster_idx):
-        return get_where_index(data, clusters, cluster_idx)
-
-    # get the variance of each cluster
-    return [np.var(compute_distances_from_centroid(get_cluster(i))) for i in range(k)]
 
 
 if __name__ == '__main__':
