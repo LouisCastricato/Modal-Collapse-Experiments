@@ -1,7 +1,7 @@
 # This file is used to load faiss indexes and compute our variance metric
 
-from utils import get_hypersphere_points, compute_distances_from_centroid, generate_singular_value_plot
-from indexing.faiss_indexers import DenseFlatIndexer
+from modalcollapse.utils import get_hypersphere_points, compute_distances_from_centroid, generate_singular_value_plot
+from modalcollapse.indexing.faiss_indexers import DenseFlatIndexer
 import numpy as np
 
 
