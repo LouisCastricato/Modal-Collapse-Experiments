@@ -159,8 +159,8 @@ class DenseFlatIndexer(DenseIndexer):
         """
         self.index = faiss.index_factory(vector_sz, "IVF64,Flat", faiss.METRIC_INNER_PRODUCT)
         
-        res = faiss.StandardGpuResources() # use a single GPU
-        self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
+        #res = faiss.StandardGpuResources() # use a single GPU
+        #self.index = faiss.index_cpu_to_gpu(res, 0, self.index)
 
 
     def index_data(self, data: List[Tuple[object, np.array]]):

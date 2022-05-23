@@ -84,12 +84,12 @@ def generate_singular_value_plot(data, k=None, size=10000):
     Generates a singular value plot for the given data.
     :param data: numpy array of shape (n, d)
     :param k: number of singular values to plot
-    :param size: number of points to use for the plot
+    :param size: number of points to udse for the plot
     """
     # if len(data) > size, sample data
     if len(data) > size:
         idxs = np.random.choice(range(len(data)), size, replace=False)
         data = data[idxs]
-
+    data = np.float64(data)
     # compute SVD
     return np.flip(np.linalg.eigvalsh(np.cov(data.T)))
