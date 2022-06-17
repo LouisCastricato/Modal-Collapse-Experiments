@@ -10,17 +10,8 @@ from multiprocess import Pool
 
 if __name__ == '__main__':
 
-    # constants
-    data_points = 1000000
-    dim = 128
-    cluster_count = 100
-    rotation_count = 1
-    base_path = "/home/louis_huggingface_co/Modal-Collapse-Experiments/ms_marco_"
-    paths = ["passage_embeddings"]
-    variants = ["_v1.npy"]
-
     # use base path, paths, and variants to produce a set of six strings
-    total_paths = [base_path + p + v for p in paths for v in variants]
+    total_paths = ["dataset_A.npy", "dataset_B.npy"]
 
     # generate data
     print("Loading")
