@@ -78,7 +78,7 @@ def singular_value_plot_faiss(indexer : DenseFlatIndexer, points_per_query = 500
     """
     # get points
     pts = get_cluster_points_faiss(indexer, points_per_query, filter_condition,
-        query_points=np.float32(get_hypersphere_points(set_size=256, dim=indexer.index.d)), 
+        query_points=None, 
         return_clusters=return_clusters)
 
     if return_clusters:
@@ -89,7 +89,7 @@ def singular_value_plot_faiss(indexer : DenseFlatIndexer, points_per_query = 500
     if not return_clusters:
         return singular_values
     else: 
-        return singular_values, indexes
+        return singular_values, pts, indexes
 
 def construct_faiss(dataset, data = None):
     """
