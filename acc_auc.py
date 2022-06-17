@@ -3,70 +3,59 @@
 from modalcollapse.utils import *
 import matplotlib.pyplot as plt
 from functools import partial
-from modalcollapse.indexing.faiss_utils import distance_to_centroid_faiss, singular_value_plot_faiss, batch
-from modalcollapse.indexing.faiss_indexers import DenseFlatIndexer
-from tqdm import tqdm
-from scipy.stats import skew, kurtosis
+from modalcollapse.indexing.faiss_utils import singular_value_plot_faiss, batch
 from multiprocess import Pool
-from scipy.special import softmax
+from tqdm import tqdm
+from multiprocess import Pool
 import matplotlib.pyplot as plt
 
-def compute_accuracy(contrastive_matrix):
-    """
-    :param contrastive_matrix: an nxn matrix
-    :return: accuracy (scalar from 0 to 1)
-    """
-    contrastive_matrix_i = np.argmax(softmax(contrastive_matrix, axis=0), axis=0).tolist()
-    contrastive_matrix_j = np.argmax(softmax(contrastive_matrix, axis=1), axis=1).tolist()
-
-    labels = list(range(contrastive_matrix.shape[1]))
-    acc_i = np.mean([contrastive_matrix_i[i] == labels[i] for i in range(len(labels))])
-    acc_j = np.mean([contrastive_matrix_j[i] == labels[i] for i in range(len(labels))])
-
-    return (acc_i + acc_j) / 2.
+from glob import glob
 
 
-# returns the AUC of min(get_intrinsic_dimension_plot(datasets))
-def plot_scatter(x,y):
-    plt.scatter(x,y)
-    plt.show()
-    plt.clf()
 
-def compute_scatter(graphs, clusters, dataset, file_name, title=None):
+def compute_scatter(graphs, points, clusters, file_name, title=None):
 
-    acc_answers = []
-    acc_queries = []
-    acc_answers_queries = []
+    accs = []
     aucs = []
-    for i, cluster in enumerate(clusters):
-        all_pts = []
-        all_answers = []
-        all_queries = []
-        for point in cluster:
+
+    # compute the area under the curve
+    for g in graphs:
+        aucs.append(np.trapz(g))
+
+    # we'll multithread the accuracy computation
+    def map_function(cluster_points):
+        cluster, points = cluster_points
+
+        anchors = []
+        positives = []
+        negatives = []
+        for idx, point in enumerate(cluster):
             if type(point) != tuple:
                 continue
 
-            # point[0] refers to an index in the original dataset
-            all_pts.append(dataset[point[0]])
+            # get the anchors and positives
+            anchors.append(points[idx])
+            positives.append(point[1][0][0])
+            negatives.append(point[1][1])
 
-            # the other two are the answer and query embeddings
-            all_answers.append(point[1][0])
-            all_queries.append(point[1][1])
+        # the anchors and positives right now are a list of length N of d embeddings. Stack them
+        anchors = np.stack(anchors)
+        positives = np.stack(positives)
+        negatives = np.stack(negatives)
 
-        all_pts = np.stack(all_pts, axis=0)
-        all_answers = np.stack(all_answers, axis=0)
-        all_queries = np.stack(all_queries, axis=0)
+        # concat positives and negatives
+        all_points = np.concatenate([positives, negatives], axis=0)
 
+        # compute the accuracy. don't include the hard negative
+        return compute_accuracy(np.dot(anchors, all_points.T))
 
-        acc_answers.append(compute_accuracy((all_pts @ np.transpose(all_answers))))
-        acc_queries.append(compute_accuracy((all_pts @ np.transpose(all_queries)))) 
-        acc_answers_queries.append(compute_accuracy((all_answers @ np.transpose(all_queries))))
-        aucs.append(np.trapz(graphs[i]))
+    cluster_points = zip(clusters, points)
+    pool = Pool(processes=16)
+    accs = pool.map(map_function, cluster_points)
+    pool.close()
 
     # plot a scatter plot of answer acc vs auc and query acc vs auc
-    plt.scatter(acc_answers, aucs)
-    plt.scatter(acc_queries, aucs)
-    plt.scatter(acc_answers_queries, aucs)
+    plt.scatter(accs, aucs)
 
     plt.xlabel("Accuracy")
     plt.ylabel("AUC")
@@ -75,49 +64,89 @@ def compute_scatter(graphs, clusters, dataset, file_name, title=None):
     else:
         plt.title("MS MARCO Accuracy vs AUC; " + title)
 
-    plt.legend(["Passage <-> Answer", "Passage <-> Query", "Answer <-> Query"])
-
     plt.show()
     plt.savefig(file_name)
     plt.clf()
 
+    return aucs
  
 
 if __name__ == '__main__':
 
-    # constants
-    base_path = "/home/louis_huggingface_co/Modal-Collapse-Experiments/ms_marco_"
-    paths = ["passage_embeddings"]
-    variants = [".npy", "_v1.npy"]
+    hardness = "5_0"
+    base_dirs = glob("/home/louis_huggingface_co/Varying-Hardness/"+hardness+"_hardness/*")
+    print("Loaded " + str(len(base_dirs)) + " base directories")
 
-    # use base path, paths, and variants to produce a set of six strings
-    total_paths = [base_path + p + v for p in paths for v in variants]
+    aucs = []
+    global_aucs = []
+    for idx, version in tqdm(enumerate(base_dirs), total=len(base_dirs)):
+        # constants
+        base_path = version+"/ms_marco_"
+        paths = ["anchor_embeddings"]
+        variants = [".npy"]
 
-    # generate data
-    print("Loading")
-    base_datasets = [np.float32(np.load(path)) for path in total_paths]
-    
-    # load the data that we're gonna be using to compute accuracy 
-    paths = ["answer_embeddings"]
-    total_paths = [base_path + p + v for p in paths for v in variants]
-    answer_dataset = [np.float32(np.load(path)) for path in total_paths]
+        # use base path, paths, and variants to produce a set of six strings
+        total_paths = [base_path + p + v for p in paths for v in variants]
 
-    paths = ["query_embeddings"]
-    total_paths = [base_path + p + v for p in paths for v in variants]
-    query_dataset = [np.float32(np.load(path)) for path in total_paths]
+        # generate data
+        anchor_dataset = [np.float32(np.load(path)) for path in total_paths]
 
-    paired_dataset = [zip(answer_dataset[i], query_dataset[i]) for i in range(len(answer_dataset))]
-    
-    batched = batch(base_datasets, data=paired_dataset)
+        
+        # load the data that we're gonna be using to compute accuracy 
+        paths = ["positive_embeddings"]
+        total_paths = [base_path + p + v for p in paths for v in variants]
+        positive_dataset = [np.float32(np.load(path)) for path in total_paths]
 
-    # make sure that we are returning the clusters
-    sv_faiss_clusters = partial(singular_value_plot_faiss, return_clusters=True)
+        paths = ["negative_embeddings"]
+        total_paths = [base_path + p + v for p in paths for v in variants]
+        negative_dataset = [np.float32(np.load(path)) for path in total_paths]
 
-    # get singular values
-    singular_values = list(map(sv_faiss_clusters, [batched(t) for t in tqdm(range(len(base_datasets)))]))
+        # reshape
+        d =  anchor_dataset[0].shape[-1]
 
-    graphs, clusters = zip(*singular_values)
-    graphs = np.array(graphs)
+        anchor_dataset = [np.reshape(a, (-1, d)) for a in anchor_dataset]
+        positive_dataset = [np.reshape(p, (-1, 128, d)) for p in positive_dataset]
+        negative_dataset = [np.reshape(n, (-1, d)) for n in negative_dataset]
 
-    compute_scatter(graphs[0], clusters[0], base_datasets[0], "v2_scatter.png", title="mpnet v2")
-    compute_scatter(graphs[1], clusters[1], base_datasets[1], "v1_scatter.png", title="mpnet v1")
+        paired_dataset = [zip(positive_dataset[i], negative_dataset[i]) for i in range(len(anchor_dataset))]
+        
+        batched = batch(anchor_dataset, data=paired_dataset)
+
+        # make sure that we are returning the clusters
+        sv_faiss_clusters = partial(singular_value_plot_faiss, return_clusters=True, points_per_query=64)
+
+        # get singular values
+        singular_values = list(map(sv_faiss_clusters, [batched(t) for t in range(len(anchor_dataset))]))
+
+        graphs, points, clusters = zip(*singular_values)
+        graphs = np.array(graphs)
+        points = np.array(points)
+
+        aucs.append(compute_scatter(graphs[0], points[0], clusters[0],  "DPR_DeCLUTR_"+hardness+"_"+str(idx)+".png", title="DPR Uni-DeCLUTR " + str(idx)))
+
+        # generate the global AUC as well
+        singular_values_global = list(map(generate_singular_value_plot, anchor_dataset))
+
+        global_aucs.append(np.mean(np.array([np.trapz(x) for x in singular_values_global])))
+
+    aucs = np.array(aucs)
+
+    # load the accuracy npy
+    accuracy = np.load('/home/louis_huggingface_co/Varying-Hardness/accuracies.npy')
+    accuracy = np.repeat(np.expand_dims(accuracy, axis=1), aucs.shape[1], axis=1)
+
+    loss = np.load('/home/louis_huggingface_co/Varying-Hardness/losses.npy')
+    loss = np.repeat(np.expand_dims(loss, axis=1), aucs.shape[1], axis=1)
+
+    global_aucs = np.repeat(np.expand_dims(global_aucs, axis=1), aucs.shape[1], axis=1) / np.max(global_aucs)
+
+    plot_input = {
+        "Intrinsic AUC": aucs,
+        "Extrinsic AUC": global_aucs,
+        "Accuracy": accuracy,
+        "Loss": loss
+    }
+
+    plot_confidence_intervals(plot_input, "DPR_DeCLUTR_"+hardness+"_accuracy.png", show=True)
+
+

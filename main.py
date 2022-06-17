@@ -16,8 +16,8 @@ if __name__ == '__main__':
     cluster_count = 100
     rotation_count = 1
     base_path = "/home/louis_huggingface_co/Modal-Collapse-Experiments/ms_marco_"
-    paths = ["answer_embeddings_no_dupe", "query_embeddings_no_dupe", "passage_embeddings"]
-    variants = [".npy", "_v1.npy"]
+    paths = ["passage_embeddings"]
+    variants = ["_v1.npy"]
 
     # use base path, paths, and variants to produce a set of six strings
     total_paths = [base_path + p + v for p in paths for v in variants]
@@ -32,10 +32,11 @@ if __name__ == '__main__':
     batched = batch(datasets)
 
     def cosine_filter_condition(pt1, pt2):
-        return (np.dot(pt1, pt2) / (np.linalg.norm(pt1) * np.linalg.norm(pt2)) > 0.2)
+        return (np.dot(pt1, pt2) / (np.linalg.norm(pt1) * np.linalg.norm(pt2)) > 0)
 
+    sv_plot_faiss_filtered = partial(singular_value_plot_faiss)
     # get variance
-    singular_values = list(map(singular_value_plot_faiss, [batched(t) for t in tqdm(range(len(datasets)))]))
+    singular_values = list(map(sv_plot_faiss_filtered, [batched(t) for t in tqdm(range(len(datasets)))]))
     singular_values_global = list(map(generate_singular_value_plot, tqdm(datasets)))
 
     for idx, (svl, svg) in enumerate(zip(singular_values, singular_values_global)):

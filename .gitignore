@@ -128,3 +128,6 @@ dmypy.json
 # Pyre type checker
 .pyre/
 download_rag_index.py
+
+*.npy
+*.png
