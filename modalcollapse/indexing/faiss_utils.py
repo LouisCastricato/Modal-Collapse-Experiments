@@ -1,7 +1,7 @@
 # This file is used to load faiss indexes and compute our variance metric
-
-from modalcollapse.utils import compute_distances_from_centroid, generate_singular_value_plot
+from modalcollapse.dataset_generation import get_hypersphere_points
 from modalcollapse.indexing.faiss_indexers import DenseFlatIndexer
+from modalcollapse.utils import compute_distances_from_centroid, generate_singular_value_plot, generate_uniformity_plot
 import numpy as np
 
 
@@ -78,7 +78,7 @@ def singular_value_plot_faiss(indexer : DenseFlatIndexer, points_per_query = 500
     """
     # get points
     pts = get_cluster_points_faiss(indexer, points_per_query, filter_condition,
-        query_points=None, 
+        query_points=np.float32(get_hypersphere_points(set_size=32, dim=indexer.index.d)), 
         return_clusters=return_clusters)
 
     if return_clusters:
@@ -86,6 +86,30 @@ def singular_value_plot_faiss(indexer : DenseFlatIndexer, points_per_query = 500
 
     # compute the distance to centroid for each of the points
     singular_values = [generate_singular_value_plot(pts[i]) for i in range(len(pts))]
+    if not return_clusters:
+        return singular_values
+    else: 
+        return singular_values, pts, indexes
+
+def uniformity_plot_faiss(indexer : DenseFlatIndexer, points_per_query = 500, filter_condition = default_condition, return_clusters = False):
+    """
+    Computes an SVD diagram per cluster.
+    :param index: faiss index
+    :param points_per_query: number of points per query
+    :param filter_condition: function that returns True if the point should be included in the output
+    :param return_clusters: if True, returns a list of points per cluster
+    :return: numpy array of shape (points, dim)
+    """
+    # get points
+    pts = get_cluster_points_faiss(indexer, points_per_query, filter_condition,
+        query_points=np.float32(get_hypersphere_points(set_size=32, dim=indexer.index.d)), 
+        return_clusters=return_clusters)
+
+    if return_clusters:
+        pts, indexes = pts
+
+    # compute the distance to centroid for each of the points
+    singular_values = [generate_uniformity_plot(pts[i]) for i in range(len(pts))]
     if not return_clusters:
         return singular_values
     else: 
