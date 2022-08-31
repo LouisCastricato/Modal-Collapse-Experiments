@@ -60,13 +60,28 @@ def generate_uniformity_plot(data):
     Generates a uniformity plot for the given data.
     :param data: numpy array of shape (n, d)
     """
-    # compute SVD
+    # normalize data
+    data = data / np.linalg.norm(data, axis=1, keepdims=True)
     try:
         sq_pdist = pdist(data.T, 'sqeuclidean')
         return np.log(np.mean(np.exp(-2 * sq_pdist)))
     except:
         return np.ones(data.shape[1])
 
+def generate_alignment_plot(x,y,alpha=2.):
+    """
+    Generates an alignment plot for the given data.
+    :param x: numpy array of shape (n, d)
+    :param y: numpy array of shape (n, d)
+    :param alpha: float (hparam)
+    """
+    # normalize data
+    x = x / np.linalg.norm(x, axis=1, keepdims=True)
+    y = y / np.linalg.norm(y, axis=1, keepdims=True)
+    try:
+        return np.mean(np.linalg.norm(x - y, axis=1)**alpha)
+    except:
+        return np.ones(x.shape[1])
 
 def compute_accuracy(contrastive_matrix):
     """
@@ -83,7 +98,6 @@ def compute_accuracy(contrastive_matrix):
     return (acc_i + acc_j) / 2.
 
 
-# returns the AUC of min(get_intrinsic_dimension_plot(datasets))
 def plot_scatter(x,y):
     plt.scatter(x,y)
     plt.show()
@@ -103,7 +117,7 @@ def plot_confidence_intervals(plts, save_to_dir = None, title = None, show=True,
     :param subplot: whether to plot in a subplot
     :return: None
     """
-    plt.figure(figsize=(20, 10))
+    plt.figure(figsize=(40, 10))
     colors = []
     if subplot:
         subplot_len = len(list(plts.values()))
